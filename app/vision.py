@@ -1,8 +1,10 @@
 """Claude Vision API를 이용한 아파트너 앱 스크린샷 분석."""
+import base64
 import json
 import re
 
 import anthropic
+import httpx
 from pydantic import BaseModel
 
 from .config import settings
@@ -52,6 +54,12 @@ def analyze_screenshot(image_url: str) -> VerificationResult:
     """
     client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
 
+    # Kakao 보안 CDN URL은 직접 접근 불가 → base64로 변환
+    img_response = httpx.get(image_url, timeout=10)
+    img_response.raise_for_status()
+    img_data = base64.standard_b64encode(img_response.content).decode("utf-8")
+    media_type = img_response.headers.get("content-type", "image/jpeg").split(";")[0]
+
     response = client.messages.create(
         model=settings.model,
         max_tokens=256,
@@ -62,8 +70,9 @@ def analyze_screenshot(image_url: str) -> VerificationResult:
                     {
                         "type": "image",
                         "source": {
-                            "type": "url",
-                            "url": image_url,
+                            "type": "base64",
+                            "media_type": media_type,
+                            "data": img_data,
                         },
                     },
                     {
