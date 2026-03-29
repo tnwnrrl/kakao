@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  kakao-auth:
+    build: .
+    container_name: kakao-auth
+    restart: unless-stopped
+    ports:
+      - "8084:8000"
+    env_file:
+      - .env
+    environment:
+      - TZ=Asia/Seoul
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: kakao-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - kakao-auth
