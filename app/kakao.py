@@ -33,7 +33,11 @@ def extract_image_url(payload: dict) -> str | None:
     return None
 
 
-def build_simple_text_response(text: str, retry_block_id: str | None = None) -> dict:
+def build_simple_text_response(
+    text: str,
+    retry_block_id: str | None = None,
+    consult_block_id: str | None = None,
+) -> dict:
     """Kakao i 오픈빌더 2.0 simpleText 응답 포맷 생성."""
     template: dict = {
         "outputs": [
@@ -44,12 +48,24 @@ def build_simple_text_response(text: str, retry_block_id: str | None = None) -> 
             }
         ]
     }
+    quick_replies = []
     if retry_block_id:
-        template["quickReplies"] = [
-            {
-                "label": "다시 시도",
-                "action": "block",
-                "blockId": retry_block_id,
-            }
-        ]
+        quick_replies.append({
+            "label": "다시 시도",
+            "action": "block",
+            "blockId": retry_block_id,
+        })
+    if consult_block_id:
+        quick_replies.append({
+            "label": "실거주자 아닐경우",
+            "action": "block",
+            "blockId": consult_block_id,
+        })
+        quick_replies.append({
+            "label": "상담 연결",
+            "action": "block",
+            "blockId": consult_block_id,
+        })
+    if quick_replies:
+        template["quickReplies"] = quick_replies
     return {"version": "2.0", "template": template}

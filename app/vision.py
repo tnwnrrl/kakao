@@ -1,6 +1,7 @@
 """Claude Vision API를 이용한 아파트너 앱 스크린샷 분석."""
 import base64
 import json
+import logging
 import re
 
 import anthropic
@@ -8,6 +9,8 @@ import httpx
 from pydantic import BaseModel
 
 from .config import settings
+
+logger = logging.getLogger(__name__)
 
 
 EXTRACTION_PROMPT = """이 스크린샷은 아파트너 앱의 마이페이지 화면입니다.
@@ -55,11 +58,14 @@ def analyze_screenshot(image_url: str) -> VerificationResult:
     client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
 
     # Kakao 보안 CDN URL은 직접 접근 불가 → base64로 변환
+    logger.info("Downloading image: %s", image_url[:80])
     img_response = httpx.get(image_url, timeout=10)
     img_response.raise_for_status()
     img_data = base64.standard_b64encode(img_response.content).decode("utf-8")
     media_type = img_response.headers.get("content-type", "image/jpeg").split(";")[0]
+    logger.info("Image downloaded: %d bytes, media_type=%s", len(img_response.content), media_type)
 
+    logger.info("Calling Anthropic API with model=%s", settings.model)
     response = client.messages.create(
         model=settings.model,
         max_tokens=256,
@@ -85,6 +91,15 @@ def analyze_screenshot(image_url: str) -> VerificationResult:
     )
 
     raw = response.content[0].text.strip()
+    input_tokens = response.usage.input_tokens
+    output_tokens = response.usage.output_tokens
+    cost_usd = (input_tokens * 0.80 + output_tokens * 4.0) / 1_000_000
+    cost_krw = cost_usd * 1350
+    logger.info(
+        "tokens: input=%d output=%d | cost=₩%.2f ($%.5f) | model=%s",
+        input_tokens, output_tokens, cost_krw, cost_usd, settings.model,
+    )
+    logger.info("Anthropic response: %s", raw[:200])
 
     # JSON 블록이 마크다운으로 감싸진 경우 제거
     json_match = re.search(r"\{.*\}", raw, re.DOTALL)

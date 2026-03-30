@@ -1,44 +1,40 @@
 #!/bin/bash
 # 와이시티 입주민 인증 챗봇 NAS 배포 스크립트
 
-NAS_HOST="tnwnrrl.synology.me"
+NAS_HOST="192.168.219.187"
 NAS_PORT="55"
 NAS_USER="tnwnrrl"
 NAS_PATH="/volume1/homes/tnwnrrl/kakao"
-DOCKER_COMPOSE="/volume2/@appstore/Docker/usr/bin/docker-compose"
 LOCAL_PATH="$(cd "$(dirname "$0")" && pwd)"
 
 echo "=== 와이시티 인증봇 NAS 배포 ==="
 
-# 1. rsync로 파일 전송 (.env 제외)
+# 1. tar로 파일 전송 (볼륨 마운트된 app/ + docker-compose.yml)
 echo "[1/2] 파일 전송 중..."
-rsync -avz \
-  --exclude='.env' \
+tar czf /tmp/kakao_deploy.tar.gz \
   --exclude='__pycache__' \
   --exclude='*.pyc' \
-  --exclude='.git' \
-  --exclude='.playwright-mcp' \
-  -e "ssh -p ${NAS_PORT}" \
-  "${LOCAL_PATH}/" \
-  "${NAS_USER}@${NAS_HOST}:${NAS_PATH}/"
+  -C "${LOCAL_PATH}" \
+  app/ docker-compose.yml
+
+ssh -p ${NAS_PORT} ${NAS_USER}@${NAS_HOST} "cat > /tmp/kakao_deploy.tar.gz" < /tmp/kakao_deploy.tar.gz
 
 if [ $? -ne 0 ]; then
   echo "파일 전송 실패"
   exit 1
 fi
 
-# 2. Docker 컨테이너 빌드 & 실행
-echo "[2/2] Docker 컨테이너 빌드 중..."
 ssh -p ${NAS_PORT} ${NAS_USER}@${NAS_HOST} \
-  "cd ${NAS_PATH} && ${DOCKER_COMPOSE} up -d --build"
+  "cd ${NAS_PATH} && tar xzf /tmp/kakao_deploy.tar.gz 2>/dev/null; rm -f /tmp/kakao_deploy.tar.gz"
+echo "파일 전송 완료"
 
-if [ $? -eq 0 ]; then
-  echo ""
-  echo "배포 완료!"
-  echo "내부 주소: http://192.168.219.187:8084"
-  echo "외부 주소: https://kakao.mysterydam.com"
-  echo "Kakao 스킬 URL: https://kakao.mysterydam.com/webhook"
-else
-  echo "Docker 실행 실패"
-  exit 1
-fi
+# 2. 컨테이너 재시작 (볼륨 마운트 → 파일 복사만으로 코드 반영)
+echo "[2/2] 컨테이너 재시작 중..."
+ssh -p ${NAS_PORT} -t ${NAS_USER}@${NAS_HOST} \
+  "sudo -S /usr/local/bin/docker restart kakao-auth 2>&1" < <(echo "Aksksla12!")
+
+echo ""
+echo "배포 완료!"
+echo "내부 주소: http://192.168.219.187:8084"
+echo "외부 주소: https://kakao.mysterydam.com"
+echo "Kakao 스킬 URL: https://kakao.mysterydam.com/webhook"

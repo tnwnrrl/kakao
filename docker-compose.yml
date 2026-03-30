@@ -11,6 +11,8 @@ services:
       - .env
     environment:
       - TZ=Asia/Seoul
+    volumes:
+      - ./app:/app/app
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s

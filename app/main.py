@@ -16,6 +16,7 @@ from .vision import analyze_screenshot
 
 KST = timezone(timedelta(hours=9))
 IMAGE_AUTH_BLOCK_ID = "69c8d94c21c97a333fde5d0f"
+CONSULT_BLOCK_ID = "69c92fe021c97a333fde6634"
 
 app = FastAPI(title="와이시티 입주민 인증 챗봇")
 
@@ -77,6 +78,7 @@ async def kakao_webhook(request: Request):
             "스크린샷으로 찍어 전송해 주세요.\n\n"
             "⚠️ 스크린샷은 찍은 직후 10분 이내에 전송해야 합니다.",
             retry_block_id=IMAGE_AUTH_BLOCK_ID,
+            consult_block_id=CONSULT_BLOCK_ID,
         )
 
     # 2. Claude Vision 분석 (Kakao 5초 타임아웃 대응: 4초 제한)
@@ -89,7 +91,8 @@ async def kakao_webhook(request: Request):
         return build_simple_text_response(
             "이미지 분석이 지연되고 있습니다. 잠시 후 다시 시도해 주세요."
         )
-    except Exception:
+    except Exception as e:
+        logger.exception("Vision analysis error: %s", e)
         return build_simple_text_response(
             "이미지 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
         )
@@ -103,6 +106,7 @@ async def kakao_webhook(request: Request):
             "아파트너 앱 마이페이지 화면이 아닌 것 같아요.\n"
             "마이페이지 전체 화면을 캡처해서 다시 보내주세요.",
             retry_block_id=IMAGE_AUTH_BLOCK_ID,
+            consult_block_id=CONSULT_BLOCK_ID,
         )
 
     # 3-2. 아파트 이름 확인
@@ -112,6 +116,7 @@ async def kakao_webhook(request: Request):
             "'일산 와이시티' 단지 화면이 아닙니다.\n"
             "아파트너 앱에서 '일산 와이시티' 단지를 선택 후 마이페이지를 캡처해 주세요.",
             retry_block_id=IMAGE_AUTH_BLOCK_ID,
+            consult_block_id=CONSULT_BLOCK_ID,
         )
 
     # 3-3. 동·호수 확인
@@ -121,6 +126,7 @@ async def kakao_webhook(request: Request):
             "동과 호수 정보를 확인할 수 없어요.\n"
             "동호수가 모두 보이도록 전체 화면을 캡처해 주세요.",
             retry_block_id=IMAGE_AUTH_BLOCK_ID,
+            consult_block_id=CONSULT_BLOCK_ID,
         )
 
     # 3-4. 상태바 시간 존재 여부
@@ -130,6 +136,7 @@ async def kakao_webhook(request: Request):
             "핸드폰 상단 상태바의 시계를 인식하지 못했어요.\n"
             "상태바(시계)가 보이도록 전체 화면을 캡처해 주세요.",
             retry_block_id=IMAGE_AUTH_BLOCK_ID,
+            consult_block_id=CONSULT_BLOCK_ID,
         )
 
     # 3-5. 시간 차이 10분 이내
@@ -141,6 +148,7 @@ async def kakao_webhook(request: Request):
             f"스크린샷 촬영 후 10분이 지났어요.\n"
             "지금 바로 다시 찍어서 보내주세요.",
             retry_block_id=IMAGE_AUTH_BLOCK_ID,
+            consult_block_id=CONSULT_BLOCK_ID,
         )
 
     # 4. 인증 성공

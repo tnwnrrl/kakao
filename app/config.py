@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     chat_room_link: str
     chat_room_code: str
     time_tolerance_minutes: int = 10
-    model: str = "claude-opus-4-6"
+    model: str = "claude-haiku-4-5-20251001"
 
     class Config:
         env_file = ".env"
