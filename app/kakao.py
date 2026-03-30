@@ -57,12 +57,7 @@ def build_simple_text_response(
         })
     if consult_block_id:
         quick_replies.append({
-            "label": "실거주자 아닐경우",
-            "action": "block",
-            "blockId": consult_block_id,
-        })
-        quick_replies.append({
-            "label": "상담 연결",
+            "label": "실거주자 아닐 경우",
             "action": "block",
             "blockId": consult_block_id,
         })

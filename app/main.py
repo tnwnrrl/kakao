@@ -11,12 +11,13 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 from .config import settings
+from .dynamic_config import get_code, set_code
 from .kakao import build_simple_text_response, extract_image_url
 from .vision import analyze_screenshot
 
 KST = timezone(timedelta(hours=9))
 IMAGE_AUTH_BLOCK_ID = "69c8d94c21c97a333fde5d0f"
-CONSULT_BLOCK_ID = "69c92fe021c97a333fde6634"
+CONSULT_BLOCK_ID = "69ca4c4745b6624e9318d547"
 
 app = FastAPI(title="와이시티 입주민 인증 챗봇")
 
@@ -157,7 +158,44 @@ async def kakao_webhook(request: Request):
         f"🏢 {result.building}동 {result.unit}호\n\n"
         f"아래 링크로 입장해 주세요:\n"
         f"{settings.chat_room_link}\n\n"
-        f"입장 코드: {settings.chat_room_code}"
+        f"참여코드: {get_code(settings.chat_room_code)}\n\n"
+        f"⚠️ 참여코드는 정기적으로 교체되니 지금 바로 입장해 주세요.\n"
+        f"입장이 되지 않는 경우, 다시 인증을 시도해 주세요."
+    )
+
+
+@app.post("/webhook/admin")
+async def admin_update_code(request: Request):
+    """관리자 참여코드 변경. 카카오 user_id로 인증."""
+    payload = await request.json()
+    user_id = payload.get("userRequest", {}).get("user", {}).get("id", "")
+    logger.info("Admin request from user_id: %s", user_id)
+
+    # ADMIN_USER_KEY 미설정 시 user_id 안내 (최초 설정용)
+    if not settings.admin_user_key:
+        return build_simple_text_response(
+            f"ADMIN_USER_KEY가 설정되지 않았습니다.\n.env에 아래 값을 추가하세요:\n\nADMIN_USER_KEY={user_id}"
+        )
+
+    if user_id != settings.admin_user_key:
+        logger.warning("Unauthorized admin attempt: %s", user_id)
+        return build_simple_text_response("권한이 없습니다.")
+
+    new_code = payload.get("action", {}).get("params", {}).get("code", "").strip()
+    if not new_code:
+        return build_simple_text_response("코드를 입력해주세요.")
+
+    set_code(new_code)
+    return build_simple_text_response(f"✅ 참여코드가 {new_code}로 변경되었습니다.")
+
+
+@app.post("/webhook/non-resident")
+async def non_resident():
+    """실거주자 아닐 경우 안내 응답."""
+    return build_simple_text_response(
+        "현재는 실거주자만 인증이 가능합니다.\n\n"
+        "실거주자 본인의 아파트너 앱에서 마이페이지를 캡처하여 다시 시도해 주세요.",
+        retry_block_id=IMAGE_AUTH_BLOCK_ID,
     )
 
 
